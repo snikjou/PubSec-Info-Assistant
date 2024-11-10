@@ -408,6 +408,9 @@ setIsLoading(false);
                                     <ExampleList onExampleClicked={onExampleClicked} />
                                 </div>
                             }
+                             <span className={styles.chatEmptyObjectives}>
+                                <i>Notice: This conversation will be recorded and may be used for quality assurance and service improvement purposes. By continuing, you consent to this recording. </i>
+                            </span>
                         </div>
                     ) : (
                         <div className={styles.chatMessageStream}>
