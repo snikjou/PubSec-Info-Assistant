@@ -8,6 +8,13 @@ import urllib.parse
 from datetime import datetime, timedelta
 from typing import Any, Sequence
 
+import azure.cosmos.cosmos_client as cosmos_client
+import azure.cosmos.exceptions as exceptions
+from azure.cosmos.partition_key import PartitionKey
+import datetime
+import random
+import os
+
 import openai
 from openai import  AsyncAzureOpenAI
 from openai import BadRequestError
@@ -502,3 +509,49 @@ class ChatReadRetrieveReadApproach(Approach):
         except Exception as error:
             logging.error(f"Unable to parse source file name: {str(error)}")
             return ""
+
+def log_chat(self, request_json) -> None:
+    HOST =  os.environ["COSMOSDB_HOST"]
+    MASTER_KEY =  os.environ["COSMOSDB_MASTER_KEY"]
+    DATABASE_ID =  os.environ["COSMOSDB_DATABASE_ID"]
+    CONTAINER_ID =  os.environ["COSMOSDB_CONTAINER_ID"]
+    client = cosmos_client.CosmosClient(HOST, {'masterKey': MASTER_KEY}, user_agent="OpenAIChatBot", user_agent_overwrite=True)
+    try:
+        try:
+            db = client.create_database(id=DATABASE_ID)
+            print('Database with id \'{0}\' created'.format(DATABASE_ID))
+
+        except exceptions.CosmosResourceExistsError:
+            db = client.get_database_client(DATABASE_ID)
+            print('Database with id \'{0}\' was found'.format(DATABASE_ID))
+
+        # setup container for this sample
+        try:
+            container = db.create_container(id=CONTAINER_ID, partition_key=PartitionKey(path='/sessionID'))
+            print('Container with id \'{0}\' created'.format(CONTAINER_ID))
+
+        except exceptions.CosmosResourceExistsError:
+            container = db.get_container_client(CONTAINER_ID)
+            print('Container with id \'{0}\' was found'.format(CONTAINER_ID))
+
+        session_id = str(datetime.date.today()) + "-" + request_json["sessionId"]
+
+        current_time = datetime.datetime.now();
+        log_entry = {'id' : current_time.isoformat() + "-" + session_id,
+                'datetime' : current_time.strftime("%Y-%m-%d %H:%M:%S"),
+                'sessionID' : session_id,
+                'user_input' : request_json["question"],
+                'model_response' : request_json["response"],
+                'model_response_time' : request_json["responseTime"],
+                'feedback' : 'No Value',
+                'error_flag' : request_json["errorFlag"]
+                }
+        container.create_item(body=log_entry)
+
+    except exceptions.CosmosHttpResponseError as e:
+        print('\nlog chat history has caught an error. {0}'.format(e.message))
+        return '-1'
+
+    finally:
+            print("\nlog chat history done")
+            return log_entry['id']

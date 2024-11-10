@@ -12,7 +12,7 @@ import urllib.parse
 import pandas as pd
 import pydantic
 from fastapi.staticfiles import StaticFiles
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, Form, APIRouter
 from fastapi.responses import RedirectResponse, StreamingResponse
 import openai
 from approaches.comparewebwithwork import CompareWebWithWork
@@ -901,3 +901,40 @@ app.mount("/", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     log.info("IA WebApp Starting Up...")
+
+#from fastapi import APIRouter
+bp = APIRouter()
+
+@bp.route("/log_chat", methods=["POST"])
+async def log_chat(request: Request) # Defines a new asynchronous route handler for the '/log_chat' endpoint, accepting only POST requests.
+
+    if not request.is_json:
+        # Checks if the incoming request content type is JSON.
+        return JSONResponse(content={"error": "request must be json"}, status_code=415)
+        # If the content type is not JSON, returns an error message in JSON format with a 415 Unsupported Media Type status code.
+
+    request_json = await request.get_json()
+    # Asynchronously retrieves and parses the JSON body of the request, storing it in 'request_json'.
+
+    auth_helper = current_app.config[CONFIG_AUTH_CLIENT]
+    # Retrieves an authentication helper object from the application’s configuration, using 'CONFIG_AUTH_CLIENT' as the key.
+
+    # auth_claims = await auth_helper.get_auth_claims_if_enabled(request.headers)
+    # (Commented out) If enabled, this line would asynchronously retrieve authentication claims from the request headers.
+
+    try:
+        impl = current_app.config[CONFIG_CHAT_APPROACH]
+        # Retrieves the chat logging implementation (e.g., logging to a database) from the application’s configuration.
+        
+        response = impl.log_chat(request_json)
+        # Calls the 'log_chat' function from the implementation object, passing the parsed JSON data, and stores the response.
+
+        return response
+        # Returns the response from the 'log_chat' function to the client.
+
+    except Exception as e:
+        logging.exception("Exception in /chat")
+        # Logs any exceptions that occur within the 'try' block to the application logs for debugging.
+
+        return jsonify({"error": str(e)}), 500
+        # Returns a JSON error response with a 500 Internal Server Error status code, including the exception message.

@@ -11,7 +11,7 @@ import styles from "./Chat.module.css";
 import rlbgstyles from "../../components/ResponseLengthButtonGroup/ResponseLengthButtonGroup.module.css";
 import rtbgstyles from "../../components/ResponseTempButtonGroup/ResponseTempButtonGroup.module.css";
 
-import { chatApi, Approaches, ChatResponse, ChatRequest, ChatTurn, ChatMode, getFeatureFlags, GetFeatureFlagsResponse } from "../../api";
+import { chatApi, ChatHistory, Approaches, ChatResponse, ChatRequest, ChatTurn, ChatMode, getFeatureFlags, GetFeatureFlagsResponse } from "../../api";
 import { Answer, AnswerError, AnswerLoading } from "../../components/Answer";
 import { QuestionInput } from "../../components/QuestionInput";
 import { ExampleList } from "../../components/Example";
@@ -81,74 +81,101 @@ const Chat = () => {
         }
     }
 
-    const makeApiRequest = async (question: string, approach: Approaches, 
-                                work_citation_lookup: { [key: string]: { citation: string; source_path: string; page_number: string } },
-                                web_citation_lookup: { [key: string]: { citation: string; source_path: string; page_number: string } },
-                                thought_chain: { [key: string]: string}) => {
-        lastQuestionRef.current = question;
-        lastQuestionWorkCitationRef.current = work_citation_lookup;
-        lastQuestionWebCitiationRef.current = web_citation_lookup;
-        lastQuestionThoughtChainRef.current = thought_chain;
-        setActiveApproach(approach);
-
-        error && setError(undefined);
-        setIsLoading(true);
-        setActiveCitation(undefined);
-        setActiveAnalysisPanelTab(undefined);
-
-        try {
-            const history: ChatTurn[] = answers.map(a => ({ user: a[0], bot: a[1].answer }));
-            const request: ChatRequest = {
-                history: [...history, { user: question, bot: undefined }],
-                approach: approach,
-                overrides: {
-                    promptTemplate: undefined,
-                    excludeCategory: undefined,
-                    top: retrieveCount,
-                    semanticRanker: true,
-                    semanticCaptions: false,
-                    suggestFollowupQuestions: useSuggestFollowupQuestions,
-                    userPersona: userPersona,
-                    systemPersona: systemPersona,
-                    aiPersona: "",
-                    responseLength: responseLength,
-                    responseTemp: responseTemp,
-                    selectedFolders: selectedFolders.includes("selectAll") ? "All" : selectedFolders.length == 0 ? "All" : selectedFolders.join(","),
-                    selectedTags: selectedTags.map(tag => tag.name).join(",")
-                },
-                citation_lookup: approach == Approaches.CompareWebWithWork ? web_citation_lookup : approach == Approaches.CompareWorkWithWeb ? work_citation_lookup : {},
-                thought_chain: thought_chain
-            };
-
-            const temp: ChatResponse = {
-                answer: "",
-                thoughts: "",
-                data_points: [],
-                approach: approach,
-                thought_chain: {
-                    "work_response": "",
-                    "web_response": ""
-                },
-                work_citation_lookup: {},
-                web_citation_lookup: {}
-            };
-
-            setAnswers([...answers, [question, temp]]);
-            const controller = new AbortController();
-            setAbortController(controller);
-            const signal = controller.signal;
-            const result = await chatApi(request, signal);
-            if (!result.body) {
-                throw Error("No response body");
-            }
-
-            setAnswerStream(result.body);
-        } catch (e) {
-            setError(e);
-        } finally {
-            setIsLoading(false);
-        }
+    const logChat = (question: string, response: ChatResponse, responseTime: number, errorFlag: string) => {
+        // Implement the logging logic here
+        console.log(`Question: ${question}, Response: ${response.answer}, Response Time: ${responseTime}ms, Error: ${errorFlag}`);
     };
+    
+    const makeApiRequest = async (question: string, approach: Approaches, 
+        work_citation_lookup: { [key: string]: { citation: string; source_path: string; page_number: string } },
+        web_citation_lookup: { [key: string]: { citation: string; source_path: string; page_number: string } },
+        thought_chain: { [key: string]: string}) => {
+lastQuestionRef.current = question;
+lastQuestionWorkCitationRef.current = work_citation_lookup;
+lastQuestionWebCitiationRef.current = web_citation_lookup;
+lastQuestionThoughtChainRef.current = thought_chain;
+setActiveApproach(approach);
+
+error && setError(undefined);
+setIsLoading(true);
+setActiveCitation(undefined);
+setActiveAnalysisPanelTab(undefined);
+
+const startTime = Date.now(); // Start time for responseTime calculation
+try {
+const history: ChatTurn[] = answers.map(a => ({ user: a[0], bot: a[1].answer }));
+const request: ChatRequest = {
+history: [...history, { user: question, bot: undefined }],
+approach: approach,
+overrides: {
+promptTemplate: undefined,
+excludeCategory: undefined,
+top: retrieveCount,
+semanticRanker: true,
+semanticCaptions: false,
+suggestFollowupQuestions: useSuggestFollowupQuestions,
+userPersona: userPersona,
+systemPersona: systemPersona,
+aiPersona: "",
+responseLength: responseLength,
+responseTemp: responseTemp,
+selectedFolders: selectedFolders.includes("selectAll") ? "All" : selectedFolders.length == 0 ? "All" : selectedFolders.join(","),
+selectedTags: selectedTags.map(tag => tag.name).join(",")
+},
+citation_lookup: approach == Approaches.CompareWebWithWork ? web_citation_lookup : approach == Approaches.CompareWorkWithWeb ? work_citation_lookup : {},
+thought_chain: thought_chain
+};
+
+const temp: ChatResponse = {
+answer: "",
+thoughts: "",
+data_points: [],
+approach: approach,
+thought_chain: {
+"work_response": "",
+"web_response": ""
+},
+work_citation_lookup: {},
+web_citation_lookup: {}
+};
+
+setAnswers([...answers, [question, temp]]);
+const controller = new AbortController();
+setAbortController(controller);
+const signal = controller.signal;
+const result = await chatApi(request, signal);
+const responseTime = Date.now() - startTime; // Calculate responseTime in milliseconds
+
+if (!result.body) {
+throw Error("No response body");
+}
+
+setAnswerStream(result.body);
+
+// Log the chat once the response is received
+const response: ChatResponse = await result.json(); // Assuming `result` contains the response in the format of ChatResponse
+logChat(question, response, responseTime, "N"); // Assuming "N" for no error
+
+} catch (e) {
+setError(e);
+const responseTime = Date.now() - startTime;
+const errorResponse: ChatResponse = {
+    answer: "Error occurred",
+    thoughts: "",
+    data_points: [],
+    approach: approach,
+    thought_chain: {
+        "work_response": "",
+        "web_response": ""
+    },
+    work_citation_lookup: {},
+    web_citation_lookup: {}
+};
+logChat(question, errorResponse, responseTime, "Y"); // Log with errorFlag set to "Y"
+} finally {
+setIsLoading(false);
+}
+};
 
     const clearChat = () => {
         lastQuestionRef.current = "";

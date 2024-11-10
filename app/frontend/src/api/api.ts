@@ -19,6 +19,9 @@ import { ChatResponse,
     FetchCitationFileResponse,
     } from "./models";
 
+
+const sessionId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);   
+
 export async function chatApi(options: ChatRequest, signal: AbortSignal): Promise<Response> {
     const response = await fetch("/chat", {
         method: "POST",
@@ -488,3 +491,7 @@ export async function fetchCitationFile(filePath: string) : Promise<FetchCitatio
     const fileResponse : FetchCitationFileResponse = {file_blob : await response.blob()};
     return fileResponse;
 }
+
+export async function logChatApi(historyRec: ChatHistory, idToken: string | undefined): Promise { const url = "log_chat"; return await fetch(${BACKEND_URI}/${url}, { method: "POST", headers: getHeaders(idToken), body: JSON.stringify({ sessionId: sessionId, question: historyRec.question, response: historyRec.response, responseTime: historyRec.responseTime, errorFlag: historyRec.errorFlag }) }); }
+
+export type ChatHistory = { sessionId: string, question: string, response: string, responseTime: number, errorFlag: string }
