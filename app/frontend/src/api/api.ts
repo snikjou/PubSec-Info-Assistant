@@ -492,6 +492,31 @@ export async function fetchCitationFile(filePath: string) : Promise<FetchCitatio
     return fileResponse;
 }
 
-export async function logChatApi(historyRec: ChatHistory, idToken: string | undefined): Promise { const url = "log_chat"; return await fetch(${BACKEND_URI}/${url}, { method: "POST", headers: getHeaders(idToken), body: JSON.stringify({ sessionId: sessionId, question: historyRec.question, response: historyRec.response, responseTime: historyRec.responseTime, errorFlag: historyRec.errorFlag }) }); }
+const BACKEND_URI = "https://your-backend-uri.com";
+
+function getHeaders(idToken: string | undefined) {
+    const headers: any = {
+        "Content-Type": "application/json"
+    };
+    if (idToken) {
+        headers["Authorization"] = `Bearer ${idToken}`;
+    }
+    return headers;
+}
+
+export async function logChatApi(historyRec: ChatHistory, idToken: string | undefined): Promise<Response> { 
+    const url = "log_chat"; 
+    return await fetch(`${BACKEND_URI}/${url}`, { 
+        method: "POST", 
+        headers: getHeaders(idToken), 
+        body: JSON.stringify({ 
+            sessionId: sessionId, 
+            question: historyRec.question, 
+            response: historyRec.response, 
+            responseTime: historyRec.responseTime, 
+            errorFlag: historyRec.errorFlag 
+        }) 
+    }); 
+}
 
 export type ChatHistory = { sessionId: string, question: string, response: string, responseTime: number, errorFlag: string }
